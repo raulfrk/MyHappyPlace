@@ -86,23 +86,51 @@ return {
                     vim.keymap.set('n', '<F4>', '<cmd>lua vim.lsp.buf.code_action()<cr>', opts)
 
                     -- Auto-format on save
-                vim.api.nvim_create_autocmd("BufWritePre", {
-                    buffer = event.buf,
-                    callback = function()
-                        vim.lsp.buf.format()
-                    end,
-                })
+                    vim.api.nvim_create_autocmd("BufWritePre", {
+                        buffer = event.buf,
+                        callback = function()
+                            vim.lsp.buf.format()
+                        end,
+                    })
                 end,
+            })
+            local lsp_zero = require('lsp-zero')
+
+            -- don't add this function in the `lsp_attach` callback.
+            -- `format_on_save` should run only once, before the language servers are active.
+            lsp_zero.format_on_save({
+                format_opts = {
+                    async = false,
+                    timeout_ms = 10000,
+                },
+                servers = {
+                    ['lua_ls'] = { 'lua' },
+                    ['biome'] = { 'javascript', 'typescript' },
+                }
             })
 
             require('mason-lspconfig').setup({
-                ensure_installed = {"pylsp", "lua_ls", "gopls"},
+                ensure_installed = { "pylsp", "lua_ls", "gopls" },
                 handlers = {
 
                     -- this first function is the "default handler"
                     -- it applies to every language server without a "custom handler"
                     function(server_name)
-                        require('lspconfig')[server_name].setup({})
+                        if server_name == "pylsp" then
+                            require('lspconfig')[server_name].setup({
+                                settings = {
+                                    pylsp = {
+                                        plugins = {
+                                            jedi = {
+                                                environment = vim.fn.getenv('VIRTUAL_ENV') .. '/bin/python',
+                                            },
+                                        },
+                                    },
+                                },
+                            })
+                        else
+                            require('lspconfig')[server_name].setup({})
+                        end
                     end,
                 }
             })
